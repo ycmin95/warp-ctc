@@ -10,8 +10,9 @@
 	#include <c10/cuda/CUDAGuard.h>
 	#include "ATen/cuda/CUDAEvent.h"
 
-    #include "THC.h"
-    extern THCState* state;
+    // pytorch removes THCudaMalloc/THCudaFree after torch 1.10: https://github.com/pytorch/pytorch/pull/65492
+    // #include "THC.h"
+    // extern THCState* state;
 #endif
 
 #include "ctc.h"
@@ -92,7 +93,7 @@ int gpu_ctc(torch::Tensor probs,
                        probs_size, minibatch_size,
                        options, &gpu_size_bytes);
 
-    void* gpu_workspace = THCudaMalloc(state, gpu_size_bytes);
+    void* gpu_workspace = c10::cuda::CUDACachingAllocator::raw_alloc(gpu_size_bytes);
 
     compute_ctc_loss(probs_ptr, grads_ptr,
                      labels_ptr, label_sizes_ptr,
@@ -100,7 +101,7 @@ int gpu_ctc(torch::Tensor probs,
                      minibatch_size, costs_ptr,
                      gpu_workspace, options);
 
-    THCudaFree(state, (void *) gpu_workspace);
+    c10::cuda::CUDACachingAllocator::raw_delete((void *) gpu_workspace);
     return 1;
 }
 #endif
